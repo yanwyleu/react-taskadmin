@@ -1,9 +1,5 @@
-import { useState } from 'react'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import { InventoryExample } from './client/components/dashboard/taskList';
 
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
 import './App.css'
 import TaskAdminHome from './client/pages/home';
 
@@ -18,6 +14,10 @@ function App() {
       </Routes>
     </Router>      
   )
+}
+
+export const envConfig: any = {
+  API_URL: import.meta.env.VITE_API_URL || 'http://localhost:4040'
 }
 
 export default App

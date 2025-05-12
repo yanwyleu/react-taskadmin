@@ -1,11 +1,21 @@
-import React, { Children, useState } from "react";
-import axios from 'axios'
-// import CustomTextField from "../form/textField";
-import { Button, Card, CardHeader, Input, List, ListItem, Select, Textarea, Typography } from "@material-tailwind/react";
-
-// import CustomDropDown from "./CustomDropDown";
-import { Controller, useForm } from "react-hook-form";
-import SelectOption from "@material-tailwind/react/components/Select/SelectOption";
+/* eslint-disable react-hooks/rules-of-hooks */
+import { useState, useRef, useEffect } from 'react';
+import SelectOption from '@material-tailwind/react/components/Select/SelectOption';
+import {
+  Button,
+  Card,
+  CardHeader,
+  Input,
+  Select,
+  Textarea,
+  Typography,
+} from '@material-tailwind/react';
+import { Controller, useForm } from 'react-hook-form';
+import { Task } from '../../../backend/tasks/task.interface';
+import { useAddNewTaskMutation, useUpdateTaskMutation, useDeleteTaskMutation } from '../../services/apis';
+import store from '../../store';
+import { openTask } from '../../features/tasks/task.slice';
+import { useDispatch } from 'react-redux';
 
 type SubmitFormInput = {
   title: string;
@@ -15,20 +25,26 @@ type SubmitFormInput = {
   taskID: string;
 }
 
-const ages = [
-  { value: "20-40", label: "From 20 to 40" },
-  { value: "40-50", label: "From 40 to 50" },
-]
+// const randomString = (length) => {
+//   return randomBytes(Math.ceil(length / 2))
+//     .toString('hex')
+//     .slice(0, length)
+// }
+
+export const formInit: Task = {
+  taskID: `TASK-${(Math.random() + 1).toString(36).substring(7).toUpperCase()}`,
+  title: null,
+  description: null,
+  status: null,
+  userID: null,
+}
 
 const TaskForm = () => {
 
-  const [formData, setFormData] = useState<SubmitFormInput>({
-    title: '',
-    description: '',
-    status: '',
-    userID: '',
-    taskID: '',
-  })
+  const dispatch = useDispatch();
+  const formRef = useRef();
+  const [formMode, setFormMode] = useState('new');
+  const [formData, setFormData] = useState<SubmitFormInput | Task>(formInit)
 
   const optionsList = [
     { value: "PENDG", label: "Pending" },
@@ -37,21 +53,11 @@ const TaskForm = () => {
     { value: "COMPD", label: "Completed" },
   ];
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('change-event: ', e.target, e.currentTarget, e)
-    const { name, value } = e.target || { name: '', value: e };
-    setFormData(prevData => ({ ...prevData, [name]: value }))
-  }
-
-  const onSubmit = (data) => {
-    console.log('submit-data:', data);
-  }
-    
-  const { register, handleSubmit, watch, control, formState: { errors } } = useForm<SubmitFormInput>({
+  const { register, handleSubmit, watch, control, reset, formState: { errors } } = useForm<Task>({
+    defaultValues: formInit,
     mode: "onBlur",
     resolver: async (data) => {
       try {
-        // await schema.validate(data);
         return { values: data, errors: {} }
       } catch (e) {
         // if (e instanceof z.ZodError) {
@@ -61,41 +67,68 @@ const TaskForm = () => {
     }
   })
 
-  console.log('watch: ', watch('taskID'), watch('title'))
+  // const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   console.log('change-event: ', e.target, e.currentTarget, e)
+  //   const { name, value } = e.target || { name: '', value: e };
+  //   setFormData(prevData => ({ ...prevData, [name]: value }))
+  // }
 
-
-  const formSubmit = async (e) => {
-    e.preventDefault();
-    console.log('submit-data:', formData)
-    try {
-      // const response = await axios.post('http://localhost:4040/tasks', formData, {
-      //   headers: {
-      //     // Overwrite Axios's automatically set Content-Type
-      //     'Content-Type': 'application/json'
-      //   }
-      // });
-      // console.log(response); //Will result in an error because the above endpoint doesn't exist yet
-    } catch (error) {
-      console.error(error);
+  // Subscribe to state changes
+  const unsubscribe = store.subscribe(() => {
+    const _task: Task = store.getState().tasks.task;
+    console.log('State changed:', formMode, _task?.title, `${_task.title}`, _task);
+    if (_task && _task.title) {
+      setFormData({ ..._task });
+      setFormMode('edit')
+      // console.log('set-form:', _task);
     }
-    return false;
+  });
+
+  // const [createPost] = useAddNewTaskMutation();  
+  const [addNewPost, { isLoading }] = useAddNewTaskMutation()
+  const [updateTask] = useUpdateTaskMutation()
+
+  const onSubmit = async (data: Task) => {
+    await addNewPost(data).unwrap();
+    onReset();
+    console.log('submit-data:', data);
   }
 
-  // const SelectOption = ({ key, value }) => {
-  //   // "image" will DOM image element or undefined
-  //   return new Option('Pending', 'PEND');
-  // };
+  const onEdit = async (data: Task) => {
+    await updateTask(data).unwrap();
+    setFormMode('new');
+    console.log('edit-data:', data);
+  }
+  const onCancel = (event) => {
+    event.preventDefault();
+    setFormMode('new');
+    onReset();
+    console.log('cancel-form:', formData)
+  }
 
+  const onReset = () => {
+    openTask({...formInit});
+    setFormData({ ...formInit });
+    reset();
+  }
+
+  useEffect(() => {
+    console.log('formMode-curr:', formMode)
+    if (formMode == 'new') {
+      onReset();
+    }
+  }, [formMode])
 
   return (
     <section className="text-left">
       <Card
         shadow={false}
-        className="md:px-24 md:py-14 py-8 border border-gray-300"
+        className="md:px-8 md:py-14 py-5 border border-gray-300"
       >
         <form
           className="relative"
           onSubmit={handleSubmit(onSubmit)}
+          ref={formRef}
         >
           <CardHeader shadow={false} floated={false} className="text-center">
             <Typography
@@ -103,7 +136,8 @@ const TaskForm = () => {
               color="blue-gray"
               className="mb-4 !text-3xl lg:text-4xl"
             >
-              Task Entry Form
+              Task Form 
+              {formMode == 'edit' && 'Edit'}
             </Typography>
           </CardHeader>
           <div className="">
@@ -121,6 +155,32 @@ const TaskForm = () => {
                 size="lg"
                 placeholder="Task ID"
                 name="taskID"
+                value={formData?.taskID}
+                className="focus:border-t-gray-900"
+                disabled
+                // containerProps={{
+                //   className: "min-w-full",
+                // }}
+                labelProps={{
+                  className: "hidden",
+                }}
+              />
+            </div>
+            <div>
+              <Typography
+                variant="small"
+                className="mb-2 text-left font-medium !text-gray-900"
+              >
+                User ID
+              </Typography>
+              <Input
+                {...register("userID")}
+                type="text"
+                color="gray"
+                size="lg"
+                placeholder="User ID"
+                name="userID"
+                value={formData?.userID}
                 className="focus:border-t-gray-900"
                 // containerProps={{
                 //   className: "min-w-full",
@@ -144,6 +204,7 @@ const TaskForm = () => {
                 size="lg"
                 placeholder="Title"
                 name="title"
+                value={formData?.title}
                 className="focus:border-t-gray-900"
                 // containerProps={{
                 //   className: "!min-w-full",
@@ -166,6 +227,7 @@ const TaskForm = () => {
                 color="gray"
                 placeholder="description"
                 name="description"
+                value={formData?.description}
                 className="focus:border-t-gray-900"
                 // containerProps={{
                 //   className: "!min-w-full",
@@ -182,12 +244,6 @@ const TaskForm = () => {
               >
                 Status
               </Typography>
-              {/* <Select variant="outlined" label="Select Version" children={['PENDG', 'INPRG']} placeholder={'Select Version'} onChange={handleChange}>
-                {/* <Option value='PENDG'>Pending</Option>
-                <Option value='INPRG'>In Progress</Option>
-                <Option value='ONHLD'>On Hold</Option>
-                <Option value='COMPD'>Completed</Option> 
-              </Select> */}
               <Controller
                 name="status"
                 control={control}
@@ -196,7 +252,7 @@ const TaskForm = () => {
                     variant="outlined"
                     name="data"
                     label="Select value"
-                    value={formData.status}
+                    value={formData?.status || ''}
                     onChange={onChange}>
                     {optionsList.map((it) =>
                       <SelectOption key={it.value} value={it.value}>
@@ -204,26 +260,27 @@ const TaskForm = () => {
                       </SelectOption>
                     )}
                   </Select>
-                )} />              
-              {/* <Select
-                {...register("status")}
-                onChange={(value) => { setValue('selection', value); trigger('selection'); }} 
-                value={formData.status}
-                name="status"
-                >
-                {optionsList.map((it) =>
-                  <SelectOption key={it.value} value={it.value}>
-                    {it.label}
-                  </SelectOption>
-                )}
-              </Select> */}
+                )} />
             </div>
           </div>
           <div>
             <br />
-            <Button type="submit" className="flex h-12 border-blue-gray-200 items-center justify-center gap-2" color="gray">
-              Send message
-            </Button>
+            <div style={{ display: formMode == 'new' ? 'block' : 'none' }}>
+              <Button type="submit" className="flex h-12 border-blue-gray-200 items-center justify-center gap-2" color="blue" disabled={isLoading}>
+                Submit
+              </Button>
+              <Button type="button" onClick={onReset} className="flex h-12 border-blue-gray-200 items-center justify-center gap-2" color="gray" disabled={isLoading}>
+                reset
+              </Button>
+            </div>
+            <div style={{ display: formMode != 'new' ? 'block' : 'none' }}>
+              <Button type="button" onClick={onEdit} className="flex h-12 border-blue-gray-200 items-center justify-center gap-2" color="green" >
+                Update
+              </Button>
+              <Button type="button" onClick={onCancel} className="flex h-12 border-blue-gray-200 items-center justify-center gap-2" color="red">
+                Cancel
+              </Button>
+            </div>
           </div>
         </form>
       </Card>

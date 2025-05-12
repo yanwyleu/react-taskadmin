@@ -1,230 +1,98 @@
-import React, { useEffect } from 'react';
-// import { ActionsCellRenderer } from './cells/ActionsCellRenderer';
-// import { getData } from './sample-data';
-// import { PriceCellRenderer } from './cells/PriceCellRenderer';
-import { ProductCellRenderer } from './cells/ProductCellRenderer';
-// import { StatusCellRenderer } from './cells/StatusCellRenderer';
-// import { StockCellRenderer } from './cells/StockCellRenderer';
+import Input from '@material-tailwind/react/components/Input';
+import moment from 'moment';
+import React from 'react';
+import store from '../../store';
+import { AgGridReact } from 'ag-grid-react';
+import { Button, Typography,
+  Dialog,
+  DialogHeader,
+  DialogBody,
+  DialogFooter,  
+ } from '@material-tailwind/react';
+import { openTask } from '../../features/tasks/task.slice';
+import { Task } from '../../../backend/tasks/task.interface';
+import { TaskBase } from '../../../../../Assignment/src/backend/tasks/task.interface';
+import { useDeleteTaskMutation, useGetPostsQuery, useGetTaskByIdQuery } from '../../services/apis';
+import { useDispatch } from 'react-redux';
+import 'ag-grid-community/styles/ag-grid.min.css';
+import 'ag-grid-community/styles/ag-theme-material.min.css';
+import { formInit } from './taskForm';
 
 import type {
-  ColDef,
-  GetDetailRowDataParams,
   GridApi,
   GridReadyEvent,
-  ValueFormatterFunc,
-  ValueFormatterParams,
-  ValueGetterParams,
+  GridOptions,
+  ColDef,
 } from "ag-grid-community";
-import {
-  ClientSideRowModelModule,
-} from "ag-grid-community";
-// import { ModuleRegistry, ClientSideRowModelModule } from '@ag-grid-community/core';
 
-import "ag-grid-community/styles/ag-grid.min.css";
-import "ag-grid-community/styles/ag-theme-material.min.css";
 
-import { AgGridReact } from "ag-grid-react";
 import {
-  type ChangeEvent,
   type FunctionComponent,
-  useCallback,
-  useMemo,
-  useRef,
   useState,
 } from "react";
-import Form from './taskForm';
-import Input from '@material-tailwind/react/components/Input';
-import { useDispatch } from 'react-redux';
-import { useGetPostsQuery, useLazyGetPostsQuery } from '../../services/apis';
-// import { fetchTasks, useGetPostsQuery } from '../../services/apis';
 
-// import "ag-grid-community/styles/ag-grid-no-native-widgets.css";
-// import "ag-grid-community/styles/ag-grid.css";
-// import "ag-grid-community/styles/ag-theme-quartz.css";
-// import * as styles from './main.css';
+export const TaskList: FunctionComponent = () => {
 
-// ModuleRegistry.registerModules([ClientSideRowModelModule]);
+  const [modal, setModel] = React.useState(false);
+  const handleModal = () => setModel(!modal);  
+  const [deleteID, setDeleteID] = useState();
 
-interface Props {
-  gridTheme?: string;
-  isDarkMode?: boolean;
-}
+  const statusDisplay = {
+    PEND: "Pending",
+    INPRG: "In-Progress",
+    ONHLD: "On Hold",
+    COMPD: "Completed",
+  };
 
-const paginationPageSizeSelector = [5, 10, 20];
+  // Calling the `useGetPostsQuery()` hook automatically fetches data!
+  const {
+    data: tasks = [],
+    isLoading,
+  } = useGetPostsQuery();
+  
+  const dispatch = useDispatch();
 
-const statuses = {
-  all: "All",
-  active: "Active",
-  paused: "On Hold",
-  outOfStock: "Out of Stock",
-};
+  // Calling the `useGetPostsQuery()` hook automatically fetches data!
+  const [
+    deleteTask,
+  ] = useDeleteTaskMutation();
 
-const statusFormatter: ValueFormatterFunc = ({ value }) =>
-  statuses[value as keyof typeof statuses] ?? "";
-
-export const TaskList: FunctionComponent<Props> = ({
-  gridTheme = "",
-  isDarkMode,
-}) => {
-  // const dispatch = useDispatch();
-  // const tasks = useSelector((state: RootState) => state.tasks);
-  const { data: tasks, error, isLoading } = useGetPostsQuery(); // Use RTK Query hook
-  const [tasksList, setTasksList ] = useState(tasks || []);
-
-  const gridRef = useRef<AgGridReact>(null);
-  const styles = useState({});
   let gridApi: GridApi;
   const onGridReady = (params: GridReadyEvent) => {
     gridApi = params.api;
-  };
-  
-  const [colDefs_] = useState<ColDef[]>([
-    {
-      field: "product",
-      headerName: "Album Name",
-      // cellRenderer: ProductCellRenderer,
-      // headerClass: "header-product",
-      // cellRendererParams: {
-      //   innerRenderer: ProductCellRenderer,
-      // },
-      minWidth: 300,
-    },
-    { field: "artist" },
-    // { field: "category" },
-    // { field: "year", width: 150, headerClass: "header-sku" },
-    {
-      field: "status",
-      //   valueFormatter: statusFormatter,
-      //   cellRenderer: StatusCellRenderer,
-      //   filter: true,
-      //   filterParams: {
-      //     valueFormatter: statusFormatter,
-      //   },
-      //   headerClass: "header-status",
-    },
-    {
-      field: "inventory",
-      //   cellRenderer: StockCellRenderer,
-      //   headerClass: "header-inventory",
-      //   sortable: false,
-    },
-    {
-      field: "incoming",
-      //   cellEditorParams: {
-      //     precision: 0,
-      //     step: 1,
-      //     showStepperButtons: true,
-      //   },
-      //   editable: true,
-    },
-    // {
-    //   field: "price",
-    //   width: 120,
-    //   headerClass: "header-price",
-    //   cellRenderer: PriceCellRenderer,
-    // },
-    // { field: "sold", headerClass: "header-calendar" },
-    // {
-    //   headerName: "Est. Profit",
-    //   colId: "profit",
-    //   headerClass: "header-percentage",
-    //   cellDataType: "number",
-    //   valueGetter: ({ data: { price, sold } }: ValueGetterParams) =>
-    //     (price * sold) / 10,
-    //   valueFormatter: ({ value }: ValueFormatterParams) => `£${value}`,
-    //   width: 150,
-    // },
-    // { field: "actions", cellRenderer: ActionsCellRenderer, minWidth: 194 },
-  ]);
-  // const [rowData] = useState(getData());
-  const defaultColDef = useMemo<ColDef>(
-    () => ({
-      editable: false,
-      flex: 1,
-      filter: false,
-      resizable: false,
-      minWidth: 300,
-      width: 100,
-    }),
-    []
-  );
-  const autoSizeStrategy = useMemo(
-    () => ({
-      type: "fitGridWidth",
-    }),
-    []
-  );
-  const themeClass = isDarkMode ? `${gridTheme}-dark` : gridTheme;
-  const [quickFilterText, setQuickFilterText] = useState<string>();
-  const onFilterTextBoxChanged = useCallback(
-    ({ target: { value } }: ChangeEvent<HTMLInputElement>) =>
-      setQuickFilterText(value),
-    []
-  );
 
-  // const detailCellRendererParams = useMemo(
-  //   () => ({
-  //     detailGridOptions: {
-  //       columnDefs: [
-  //         { field: "title", flex: 1.5 },
-  //         { field: "available", maxWidth: 120 },
-  //         { field: "format", flex: 2 },
-  //         { field: "label", flex: 1 },
-  //         { field: "country", flex: 0.66 },
-  //         {
-  //           field: "cat",
-  //           headerName: "Cat#",
-  //           type: "rightAligned",
-  //           flex: 0.66,
-  //         },
-  //         { field: "year", type: "rightAligned", maxWidth: 80 },
-  //       ],
-  //       headerHeight: 38,
-  //     },
-  //     getDetailRowData: ({
-  //       successCallback,
-  //       data: { variantDetails },
-  //     }: GetDetailRowDataParams) => successCallback(variantDetails),
-  //   }),
-  //   []
-  // );
-  const [activeTab, setActiveTab] = useState("all");
-  const handleTabClick = useCallback((status: string) => {
-    setActiveTab(status);
-    gridRef
-      .current!.api.setColumnFilterModel(
-        "status",
-        status === "all" ? null : { values: [status] }
-      )
-      .then(() => gridRef.current!.api.onFilterChanged());
-  }, []);
-
-  const rowData_ = useState(() => {
-    const rowData = [];
-    for (let i = 0; i < 10; i++) {
-      rowData.push({ make: "Toyota", model: "Celica", price: 35000 + i * 1000 });
-      rowData.push({ make: "Ford", model: "Mondeo", price: 32000 + i * 1000 });
-      rowData.push({
-        make: "Porsche",
-        model: "Boxster",
-        price: 72000 + i * 1000,
-      });
+    const columnState = { 
+      state: [
+        {
+          colId: 'updatedAt',
+          sort: 'desc'
+        }
+      ]
     }
-    return rowData;
-  });
+    gridApi.applyColumnState(columnState);
+  };
 
-  const [rowData, setRowData] = useState([
-    { make: "Tesla", model: "Model Y", price: 64950, electric: true },
-    { make: "Ford", model: "F-Series", price: 33850, electric: false },
-    { make: "Toyota", model: "Corolla", price: 29600, electric: false },
-  ]);
+  // Update an existing post and add "HASAN" to its title
+  const handleEditTask = (taskData) => {
+    dispatch(openTask(taskData))
+    console.log('task-edit: ', taskData, store.getState().tasks)
+  };
 
-  // Column Definitions: Defines the columns to be displayed.
+  // Delete a post and remove it from the UI immediately
+  const handleDeletePost = async (taskID: any) => {
+    await deleteTask(taskID);
+    dispatch(openTask({...formInit}))
+    setDeleteID(null);
+    handleModal();
+    gridApi.redrawRows();
+  };
+
   const [colDefs, setColDefs] = useState<ColDef[]>([
     {
       field: "taskID",
       // rowGroup: false,
-      width: 170,
+      width: 'auto',
+      suppressSizeToFit: true,
       // enableRowGroup: false,
       // enablePivot: false,
       // pinned: true,
@@ -233,320 +101,100 @@ export const TaskList: FunctionComponent<Props> = ({
     },
     { field: "title", rowGroup: false },
     { field: "description", rowGroup: false },
-    { field: "status", rowGroup: false }
+    {
+      field: "status", rowGroup: false,
+      valueFormatter: (_params: { value: string | number; }) => {
+        return statusDisplay[_params.value] || _params.value
+      }
+    },
+    {
+      field: 'updatedAt',
+      sortable: true,
+      cellDataType: 'date',
+      valueFormatter: (_params: { value: moment.MomentInput; }) => moment(_params.value).format('YYYY-MM-DD'),
+    },
+    {
+      field: 'button',
+      headerName: 'Action',
+      width: 50,
+      cellRenderer: (props: any) => {
+        return <div>
+          <Button size='sm' color='blue' onClick={() => handleEditTask(props.data)}>EDIT</Button>
+          &nbsp;
+          <Button size='sm' color='red' onClick={() => {
+            setDeleteID(props.data.taskID);
+            handleModal();
+          }}>DEL</Button>
+        </div>
+      }
+      ,
+    },
   ]);
 
-  const [columnDefs, setColumnDefs] = useState([
-    {
-      field: "make",
-      headerName: "#",
-      width: 40,
-      checkboxSelection: true,
-      sortable: false,
-      suppressMenu: true,
-      filter: false,
-      pinned: true
-    },
-    // { field: "sport" },
-    // { field: "age" },
-  ]);
-
-  const autoGroupColumnDef = useMemo<ColDef>(() => {
-    return {
-      minWidth: 200,
-    };
-  }, []);
-
-  // const columnDefs: ColDef[] = [
-  //   // {
-  //   //   headerName: "ID",
-  //   //   field: "id",
-  //   //   width: 70
-  //   // },
-  //   {
-  //     headerName: "Athlete",
-  //     field: "athlete",
-  //     width: 150,
-  //     editable: true
-  //   },
-  //   {
-  //     headerName: "Age",
-  //     field: "age",
-  //     width: 90,
-  //     minWidth: 50,
-  //     maxWidth: 100,
-  //     editable: true
-  //   },
-  //   // {
-  //   //   headerName: "Country",
-  //   //   field: "country",
-  //   //   width: 120
-  //   // },
-  //   // {
-  //   //   headerName: "Year",
-  //   //   field: "year",
-  //   //   width: 90
-  //   // },
-  //   // {
-  //   //   headerName: "Date",
-  //   //   field: "date",
-  //   //   width: 110
-  //   // },
-  //   // {
-  //   //   headerName: "Sport",
-  //   //   field: "sport",
-  //   //   width: 110
-  //   // },
-  //   // {
-  //   //   headerName: "Gold",
-  //   //   field: "gold",
-  //   //   width: 100
-  //   // },
-  //   // {
-  //   //   headerName: "Silver",
-  //   //   field: "silver",
-  //   //   width: 100
-  //   // },
-  //   // {
-  //   //   headerName: "Bronze",
-  //   //   field: "bronze",
-  //   //   width: 100
-  //   // },
-  //   // {
-  //   //   headerName: "Total",
-  //   //   field: "total",
-  //   //   width: 100
-  //   // }
-  // ];
-
-  const _rowData = [
-    {
-      athlete: "Michael Phelps",
-      "age": 23,
-      "country": "United States",
-      "year": 2008,
-      "date": "24/08/2008",
-      "sport": "Swimming",
-      "gold": 8,
-      "silver": 0,
-      "bronze": 0,
-      "total": 8
-    },
-    {
-      "athlete": "Michael Phelps",
-      "age": 19,
-      "country": "United States",
-      "year": 2004,
-      "date": "29/08/2004",
-      "sport": "Swimming",
-      "gold": 6,
-      "silver": 0,
-      "bronze": 2,
-      "total": 8
-    },
-    {
-      "athlete": "Michael Phelps",
-      "age": 27,
-      "country": "United States",
-      "year": 2012,
-      "date": "12/08/2012",
-      "sport": "Swimming",
-      "gold": 4,
-      "silver": 2,
-      "bronze": 0,
-      "total": 6
-    },
-    {
-      "athlete": "Natalie Coughlin",
-      "age": 25,
-      "country": "United States",
-      "year": 2008,
-      "date": "24/08/2008",
-      "sport": "Swimming",
-      "gold": 1,
-      "silver": 2,
-      "bronze": 3,
-      "total": 6
-    },
-    {
-      "athlete": "Aleksey Nemov",
-      "age": 24,
-      "country": "Russia",
-      "year": 2000,
-      "date": "01/10/2000",
-      "sport": "Gymnastics",
-      "gold": 2,
-      "silver": 1,
-      "bronze": 3,
-      "total": 6
-    },
-    {
-      "athlete": "Alicia Coutts",
-      "age": 24,
-      "country": "Australia",
-      "year": 2012,
-      "date": "12/08/2012",
-      "sport": "Swimming",
-      "gold": 1,
-      "silver": 3,
-      "bronze": 1,
-      "total": 5
-    },
-    {
-      "athlete": "Missy Franklin",
-      "age": 17,
-      "country": "United States",
-      "year": 2012,
-      "date": "12/08/2012",
-      "sport": "Swimming",
-      "gold": 4,
-      "silver": 0,
-      "bronze": 1,
-      "total": 5
-    },
-    {
-      "athlete": "Ryan Lochte",
-      "age": 27,
-      "country": "United States",
-      "year": 2012,
-      "date": "12/08/2012",
-      "sport": "Swimming",
-      "gold": 2,
-      "silver": 2,
-      "bronze": 1,
-      "total": 5
-    },
-    {
-      "athlete": "Allison Schmitt",
-      "age": 22,
-      "country": "United States",
-      "year": 2012,
-      "date": "12/08/2012",
-      "sport": "Swimming",
-      "gold": 3,
-      "silver": 1,
-      "bronze": 1,
-      "total": 5
-    },
-    {
-      "athlete": "Natalie Coughlin",
-      "age": 21,
-      "country": "United States",
-      "year": 2004,
-      "date": "29/08/2004",
-      "sport": "Swimming",
-      "gold": 2,
-      "silver": 2,
-      "bronze": 1,
-      "total": 5
-    },
-    {
-      "athlete": "Ian Thorpe",
-      "age": 17,
-      "country": "Australia",
-      "year": 2000,
-      "date": "01/10/2000",
-      "sport": "Swimming",
-      "gold": 3,
-      "silver": 2,
-      "bronze": 0,
-      "total": 5
-    }]
-
-  interface FormValues {
-    keyword: string;
-  }  
   const [keywordInput, setKeywordInput] = useState('');
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    // setValues({ ...values, [name]: value });
-    // setErrors({ ...errors, [name]: undefined });
-    console.log('keyword-change:', name, value)
     setKeywordInput(value);
   };
 
-  useEffect(() => {
-    console.log('list-loading?', isLoading, tasks)
-    if (tasks) {
-      try {
-
-        setTasksList(tasks);
-        console.log('list-task?', tasksList)
-        gridApi.redrawRows();
-      } catch (e) {
-        console.log('refresh-cell-err:', e)
-      }
-
-    }
-  }, [tasks]);
-  
   return (
     <div className='ag-theme-material w-full h-full bg-blue-gray-50/50'>
-      <div className='amx-auto'>
-        <div className='w-full ajustify-center px-6 py-12'>
-          {/* <div className='lg:w-5/12'>
-            <div style={{ border: 'solid 2px #f0f' }}>
-              <Form />
-            </div>
-          </div> */}
-          <div className='h-full' style={{ height: '100vh' }}>
-            <div className='w-full py-3'>
-              <Input
-                label='Keywords'
-                onChange={handleChange}
-                color="gray"
-                size="lg"
-                placeholder="Keywords"
-                name="keyword"
-                className="focus:border-t-gray-900"
-                // containerProps={{
-                //   className: "min-w-full",
-                // }}
-                labelProps={{
-                  className: "hidden",
-                }} onPointerEnterCapture={undefined} onPointerLeaveCapture={undefined} crossOrigin={undefined}              />
-            </div>
-            <div className='w-full h-full py-3'>
-              <AgGridReact
-                debug
-                // theme="legacy"
-                // ref={gridRef}
-                columnDefs={colDefs}
-                // columnDefs={[
-                //   {
-                //     field: "athlete",
-                //     headerName: "athlete",
-                //     width: 120,
-                //     sortable: false,
-                //   },
-                // ]}
-                quickFilterText={keywordInput}
-                onGridReady={onGridReady}
-                rowData={tasksList}
-                defaultColDef={{
-                  flex: 1,
-                  resizable: false,
-                  sortable: true,
-                  filter: true,
-                  headerComponentParams: {
-                    menuIcon: 'fa-bars'
-                  }
-                }}
-              // rowHeight={80}
-              // autoSizeStrategy={autoSizeStrategy}
-              //  modules={[ClientSideRowModelModule]}
-              // pagination
-              // paginationPageSize={10}
-              // paginationPageSizeSelector={paginationPageSizeSelector}
-              // masterDetail
-              // detailCellRendererParams={detailCellRendererParams}
-              // quickFilterText={quickFilterText}
-              // detailRowAutoHeight
-              />
-            </div>
-          </div>
+      <div className='w-full h-full ajustify-center px-6 py-6'>
+        <div className='w-full py-3'>
+          <Typography
+            variant="small"
+            className="mb-2 text-left font-medium !text-gray-900"
+          >
+            Keywords
+          </Typography>
+          <Input
+            label='Keywords'
+            onChange={handleChange}
+            color="gray"
+            size="lg"
+            placeholder="Keywords"
+            name="keyword"
+            className="focus:border-t-gray-900"
+            labelProps={{
+              className: "hidden",
+            }} onPointerEnterCapture={undefined} onPointerLeaveCapture={undefined} crossOrigin={undefined} />
         </div>
+        <div className='aw-full h-full apy-3' style={{ maxHeight: '90%' }}>
+          <AgGridReact
+            // debug
+            columnDefs={colDefs}
+            quickFilterText={keywordInput}
+            onGridReady={onGridReady}
+            rowData={isLoading ? null : tasks}
+            defaultColDef={{
+              flex: 1,
+              filter: false,
+              suppressSizeToFit: true,
+              headerComponentParams: {
+                menuIcon: 'fa-bars'
+              }
+            }}
+          />
+        </div>
+        <Dialog open={modal} handler={handleModal}>
+          <DialogHeader>Alert</DialogHeader>
+          <DialogBody>
+            Confirm to delete ?
+          </DialogBody>
+          <DialogFooter>
+            <Button
+              variant="text"
+              color="red"
+              onClick={handleModal}
+              className="mr-1"
+            >
+              <span>Cancel</span>
+            </Button>
+            <Button variant="gradient" color="green" onClick={() => handleDeletePost(deleteID) }>
+              <span>Confirm</span>
+            </Button>
+          </DialogFooter>
+        </Dialog>
       </div>
     </div>
   );

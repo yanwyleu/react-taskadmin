@@ -1,17 +1,19 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import App from './App.tsx'
-import { ThemeProvider } from '@material-tailwind/react'
-import { Provider } from 'react-redux'
-import { store } from './client/store.ts'
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import './index.css';
+import App from './App.tsx';
+import { ThemeProvider } from '@material-tailwind/react';
+import { Provider } from 'react-redux';
+import store from './client/store';
+
+console.log('process:', import.meta.env.VITE_API_URL)
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <ThemeProvider>
-      <Provider store={store}>
-        <App />
-      </Provider>
-    </ThemeProvider>
-  </StrictMode>,
-)
+	<StrictMode>
+		<ThemeProvider>
+			<Provider store={store}>
+				<App />
+			</Provider>
+		</ThemeProvider>
+	</StrictMode>
+);

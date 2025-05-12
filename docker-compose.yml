@@ -1,0 +1,72 @@
+version: "3.7"
+
+services:
+  # Database service
+  mongodb:
+    image: "mongodb/mongodb-community-server:5.0.15-ubuntu2004"
+    container_name: mongodb
+    hostname: mongodb
+    volumes:
+      - ./docker/mongodb/db:/data/db
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD","mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 3s      
+    environment:
+      MONGO_INITDB_DATABASE: 'missionplatform'
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+    ports:
+      - "0.0.0.0:27017:27017"
+    networks:
+      - assignment
+
+  mongo-express:
+    image: mongo-express
+    container_name: mongo-express
+    restart: always
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      ME_CONFIG_MONGODB_PORT: '27017'
+      ME_CONFIG_MONGODB_SERVER: mongodb
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGO_EXPRESS_USERNAME}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGO_EXPRESS_PASSWORD}
+      ME_CONFIG_MONGODB_URL: mongodb://mongodb:27017
+    ports:
+      - "0.0.0.0:8081:8081"
+    networks:
+      - assignment
+    depends_on:
+      mongodb:
+        condition: service_healthy  
+
+  # Frontend service
+  # node:
+  #   image: "nginx:stable-alpine-slim"
+  #   hostname: node-server
+  #   container_name: backend    
+  #   ports: 
+  #     - 80:80
+  #   environment:
+  #     - DB_HOST=mongodb_server
+  #     - DB_USER=root
+  #     - DB_PASSWORD=example
+  #     - DB_NAME=task
+  #     - DB_PORT=27017
+  #   depends_on:
+  #     - mongodb    
+  #   volumes:
+  #     - /app/build:/public
+
+
+networks:
+  assignment:
+    # Specify driver options
+    driver: bridge
+    # driver_opts:
+    #   com.docker.network.bridge.host_binding_ipv4: "127.0.0.1"
